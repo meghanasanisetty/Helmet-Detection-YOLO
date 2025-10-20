@@ -1,5 +1,0 @@
-train: data/images/train
-val: data/images/val
-
-nc: 3
-names: ['helmet', 'no_helmet', 'bike']

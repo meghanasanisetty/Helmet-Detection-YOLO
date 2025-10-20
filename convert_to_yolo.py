@@ -1,17 +1,21 @@
 import os
 import xml.etree.ElementTree as ET
 
-# Correct paths for your setup
+# --- CONFIG ---
 annotations_dir = r"data/annotations"
-output_dir = r"data/labels"
-os.makedirs(output_dir, exist_ok=True)
+images_dir = r"data/images"
+output_labels_dir = r"data/labels"
 
-# Define your class names
-classes = ["helmet", "no_helmet", "bike"]
+# Create output folder if not exists
+os.makedirs(output_labels_dir, exist_ok=True)
 
-def convert(size, box):
-    dw = 1. / size[0]
-    dh = 1. / size[1]
+# Define your classes here
+classes = ["With Helmet", "Without Helmet"]  # change if your dataset has different class names
+
+def convert_bbox(size, box):
+    """Convert Pascal VOC bbox to YOLO format"""
+    dw = 1.0 / size[0]
+    dh = 1.0 / size[1]
     x = (box[0] + box[1]) / 2.0 - 1
     y = (box[2] + box[3]) / 2.0 - 1
     w = box[1] - box[0]
@@ -25,27 +29,34 @@ def convert(size, box):
 for xml_file in os.listdir(annotations_dir):
     if not xml_file.endswith(".xml"):
         continue
+
     xml_path = os.path.join(annotations_dir, xml_file)
     tree = ET.parse(xml_path)
     root = tree.getroot()
-    
+
+    image_name = root.find("filename").text
+    image_name_no_ext = os.path.splitext(image_name)[0]
     size = root.find("size")
     w = int(size.find("width").text)
     h = int(size.find("height").text)
-    
-    txt_name = xml_file.replace(".xml", ".txt")
-    txt_path = os.path.join(output_dir, txt_name)
-    
-    with open(txt_path, "w") as out_file:
+
+    label_file = os.path.join(output_labels_dir, image_name_no_ext + ".txt")
+
+    with open(label_file, "w") as out_file:
         for obj in root.iter("object"):
             cls = obj.find("name").text
             if cls not in classes:
+                print(f"⚠️ Skipping unknown class: {cls}")
                 continue
             cls_id = classes.index(cls)
             xmlbox = obj.find("bndbox")
-            b = (float(xmlbox.find("xmin").text), float(xmlbox.find("xmax").text),
-                 float(xmlbox.find("ymin").text), float(xmlbox.find("ymax").text))
-            bb = convert((w, h), b)
+            b = (
+                float(xmlbox.find("xmin").text),
+                float(xmlbox.find("xmax").text),
+                float(xmlbox.find("ymin").text),
+                float(xmlbox.find("ymax").text),
+            )
+            bb = convert_bbox((w, h), b)
             out_file.write(f"{cls_id} {' '.join([str(a) for a in bb])}\n")
 
-print("✅ Conversion complete! Labels saved in data/labels/")
+print("✅ Conversion complete! Labels saved in:", output_labels_dir)
